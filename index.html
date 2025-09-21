@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Upload Image or PDF to Drive</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        max-width: 600px;
+        margin: auto;
+        background: #f4f6f9;
+      }
+      h2 {
+        color: #333;
+      }
+      .card {
+        background: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      }
+      input,
+      button {
+        padding: 8px;
+        margin-top: 8px;
+      }
+      #upload {
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      #upload:hover {
+        background: #0056b3;
+      }
+      #status {
+        margin-top: 15px;
+        padding: 10px;
+        background: #e9ecef;
+        border-radius: 6px;
+      }
+      #preview {
+        margin-top: 15px;
+        max-width: 100%;
+        border-radius: 8px;
+        display: none;
+      }
+      #copyBtn {
+        margin-top: 10px;
+        padding: 8px 12px;
+        border: none;
+        background: #28a745;
+        color: white;
+        border-radius: 5px;
+        cursor: pointer;
+        display: none;
+      }
+      #copyBtn:hover {
+        background: #218838;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2>Upload Image or PDF</h2>
+      <input
+        type="file"
+        id="file"
+        accept="image/*,application/pdf"
+      /><br /><br />
+      <label
+        >Target image size (KB, only for images):
+        <input type="number" id="targetKB" value="50" /> </label
+      ><br /><br />
+      <button id="upload">Upload</button>
+
+      <div id="status"></div>
+      <img id="preview" alt="preview" />
+      <button id="copyBtn">Copy URL</button>
+    </div>
+
+    <script>
+      const WEB_APP_URL =
+        "https://script.google.com/macros/s/AKfycbwA3YWME5f2bZFm_E9eGWrwHkzrlyU6fdTWOYJ3M1MD5D929Kk4l_vPS1JVeCBpb21c/exec";
+
+      // Helpers
+      function readImage(file) {
+        return new Promise((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = fr.result;
+          };
+          fr.onerror = reject;
+          fr.readAsDataURL(file);
+        });
+      }
+      function canvasToBlob(canvas, quality) {
+        return new Promise((res) => canvas.toBlob(res, "image/jpeg", quality));
+      }
+      function blobToDataURL(blob) {
+        return new Promise((res) => {
+          const fr = new FileReader();
+          fr.onload = () => res(fr.result);
+          fr.readAsDataURL(blob);
+        });
+      }
+      async function compress(file, maxBytes) {
+        const img = await readImage(file);
+        let w = img.width,
+          h = img.height;
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        let quality = 0.9;
+        while (true) {
+          canvas.width = w;
+          canvas.height = h;
+          ctx.clearRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          const blob = await canvasToBlob(canvas, quality);
+          if (blob.size <= maxBytes || quality < 0.3) return blob;
+          quality -= 0.1;
+          if (quality < 0.3) {
+            w = Math.round(w * 0.9);
+            h = Math.round(h * 0.9);
+            quality = 0.9;
+          }
+        }
+      }
+
+      document.getElementById("upload").addEventListener("click", async () => {
+        const file = document.getElementById("file").files[0];
+        if (!file) return alert("Choose a file");
+
+        const status = document.getElementById("status");
+        status.innerText = "Processing...";
+
+        try {
+          let dataUrl;
+          if (file.type.startsWith("image/")) {
+            const maxBytes =
+              (parseInt(document.getElementById("targetKB").value) || 50) *
+              1024;
+            const blob = await compress(file, maxBytes);
+            dataUrl = await blobToDataURL(blob);
+          } else if (file.type === "application/pdf") {
+            dataUrl = await new Promise((resolve, reject) => {
+              const fr = new FileReader();
+              fr.onload = () => resolve(fr.result);
+              fr.onerror = reject;
+              fr.readAsDataURL(file);
+            });
+          } else {
+            return alert("Unsupported file type");
+          }
+
+          const formData = new FormData();
+          formData.append("dataUrl", dataUrl);
+          formData.append("filename", file.name);
+          formData.append("mimeType", file.type);
+
+          status.innerText = "Uploading...";
+
+          // FIX: add CORS-safe request
+          const res = await fetch(WEB_APP_URL, {
+            method: "POST",
+            body: formData,
+            mode: "cors", // allow cross origin
+          });
+
+          if (!res.ok) throw new Error("Upload failed: " + res.status);
+          const url = await res.text();
+
+          status.innerHTML =
+            '✅ Uploaded! <a href="' +
+            url +
+            '" target="_blank">' +
+            url +
+            "</a>";
+          if (file.type.startsWith("image/")) {
+            const preview = document.getElementById("preview");
+            preview.src = url;
+            preview.style.display = "block";
+          }
+
+          const copyBtn = document.getElementById("copyBtn");
+          copyBtn.style.display = "inline-block";
+          copyBtn.onclick = () => {
+            navigator.clipboard.writeText(url);
+            alert("URL copied!");
+          };
+        } catch (e) {
+          status.innerText = "Error: " + e;
+        }
+      });
+    </script>
+  </body>
+</html>
