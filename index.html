@@ -3,86 +3,153 @@
   <head>
     <meta charset="UTF-8" />
     <title>Upload Image or PDF to Drive</title>
+
+    <!-- Favicon -->
     <link
       rel="icon"
       href="https://drive.google.com/uc?export=view&id=19-CLvAzmU7885aL5zfLbcjwPvWNkxOJn"
+      type="image/png"
     />
+
     <style>
       body {
         font-family: Arial, sans-serif;
-        padding: 20px;
-        max-width: 600px;
-        margin: auto;
-        background: #f4f6f9;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        /* Background Image */
+        background: url("https://images.unsplash.com/photo-1529070538774-1843cb3265df?auto=format&fit=crop&w=1920&q=80")
+          no-repeat center center fixed;
+        background-size: cover;
       }
-      h2 {
-        color: #333;
-      }
+
       .card {
-        background: #fff;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        background: rgba(255, 255, 255, 0.15);
+        padding: 30px;
+        border-radius: 16px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+        max-width: 500px;
+        width: 100%;
+        text-align: center;
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
       }
-      input,
-      button {
-        padding: 8px;
+
+      h2 {
+        color: #fff;
+        margin-bottom: 20px;
+        font-weight: 600;
+      }
+
+      label {
+        color: #fff;
+        font-size: 14px;
+      }
+
+      input[type="file"],
+      input[type="number"] {
+        padding: 10px;
         margin-top: 8px;
-      }
-      #upload {
-        background: #007bff;
-        color: white;
+        width: 100%;
+        border-radius: 8px;
         border: none;
-        border-radius: 5px;
+        outline: none;
+        background: rgba(255, 255, 255, 0.85);
+      }
+
+      button {
+        padding: 12px;
+        margin-top: 12px;
+        width: 100%;
+        border-radius: 8px;
+        border: none;
         cursor: pointer;
+        font-size: 16px;
+        font-weight: 600;
+        transition: 0.3s;
+      }
+
+      #upload {
+        background: linear-gradient(45deg, #007bff, #00d4ff);
+        color: white;
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
       }
       #upload:hover {
-        background: #0056b3;
+        background: linear-gradient(45deg, #0056b3, #0099cc);
+        transform: scale(1.05);
       }
+
+      #copyBtn {
+        background: linear-gradient(45deg, #28a745, #4cd964);
+        color: white;
+        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        display: none;
+      }
+      #copyBtn:hover {
+        background: linear-gradient(45deg, #218838, #34c759);
+        transform: scale(1.05);
+      }
+
       #status {
         margin-top: 15px;
-        padding: 10px;
-        background: #e9ecef;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.2);
         border-radius: 6px;
+        font-size: 14px;
+        color: #fff;
+        word-break: break-word;
       }
+
       #preview {
         margin-top: 15px;
         max-width: 100%;
         border-radius: 8px;
         display: none;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
       }
-      #copyBtn {
+
+      /* Highlighted URL Box */
+      .highlight {
+        display: block;
         margin-top: 10px;
-        padding: 8px 12px;
-        border: none;
-        background: #28a745;
-        color: white;
-        border-radius: 5px;
-        cursor: pointer;
-        display: none;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #00ffea;
+        font-weight: bold;
+        border-radius: 6px;
+        word-break: break-all;
+        text-align: center;
       }
-      #copyBtn:hover {
-        background: #218838;
+      .highlight a {
+        color: #00ffea;
+        text-decoration: none;
+      }
+      .highlight a:hover {
+        text-decoration: underline;
       }
     </style>
   </head>
   <body>
     <div class="card">
-      <h2>Upload Image or PDF</h2>
+      <h2>📤 Upload Image or PDF</h2>
       <input
         type="file"
         id="file"
         accept="image/*,application/pdf"
       /><br /><br />
-      <label
-        >Target image size (KB, only for images):
-        <input type="number" id="targetKB" value="50" /> </label
-      ><br /><br />
-      <button id="upload">Upload</button>
+      <label>
+        Target image size (KB, only for images):
+        <input type="number" id="targetKB" value="50" />
+      </label>
+      <br /><br />
+      <button id="upload">🚀 Upload</button>
 
       <div id="status"></div>
       <img id="preview" alt="preview" />
-      <button id="copyBtn">Copy URL</button>
+      <button id="copyBtn">📋 Copy URL</button>
     </div>
 
     <script>
@@ -169,22 +236,25 @@
 
           status.innerText = "Uploading...";
 
-          // FIX: add CORS-safe request
           const res = await fetch(WEB_APP_URL, {
             method: "POST",
             body: formData,
-            mode: "cors", // allow cross origin
           });
 
           if (!res.ok) throw new Error("Upload failed: " + res.status);
           const url = await res.text();
 
+          // Highlighted box with link
           status.innerHTML =
-            '✅ Uploaded! <a href="' +
+            '✅ Uploaded!<br><span class="highlight"><a href="' +
             url +
             '" target="_blank">' +
             url +
-            "</a>";
+            "</a></span>";
+
+          // Auto copy to clipboard
+          navigator.clipboard.writeText(url);
+
           if (file.type.startsWith("image/")) {
             const preview = document.getElementById("preview");
             preview.src = url;
@@ -204,4 +274,3 @@
     </script>
   </body>
 </html>
-
